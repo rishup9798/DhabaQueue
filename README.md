@@ -50,76 +50,9 @@ Staff can manually add customers who arrive without using WhatsApp.
 - Protected dashboard routes.
 - JWT-based authentication.
 
+
+
 ---
-
-## 🏗️ System Architecture
-
-```text
-                  Customer
-                     │
-                     │ WhatsApp
-                     ▼
-              WhatsApp Webhook
-                     │
-                     ▼
-              Node.js Backend
-                     │
-             ┌───────┴────────┐
-             │                │
-             ▼                ▼
-        Ollama AI          PostgreSQL
-             │                │
-             └───────┬────────┘
-                     │
-                     ▼
-              Socket.IO
-                     │
-                     ▼
-            Staff Dashboard
-             │      │      │
-             ▼      ▼      ▼
-           Queue  Tables  Food Orders
-
-Project Structure
-dhaba-queue/
-│
-├── backend/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── seed.js
-│   │
-│   ├── scripts/
-│   │   ├── generateQr.js
-│   │   └── testAi.js
-│   │
-│   └── src/
-│       ├── auth/
-│       ├── middleware/
-│       ├── queue/
-│       ├── whatsapp/
-│       ├── lib/
-│       └── server.js
-│
-├── frontend/
-│   └── src/
-│       ├── components/
-│       │   ├── ui/
-│       │   ├── QueueBoard.jsx
-│       │   ├── TableGrid.jsx
-│       │   ├── FoodTracker.jsx
-│       │   └── AddWalkInForm.jsx
-│       │
-│       ├── pages/
-│       │   ├── HomePage.jsx
-│       │   ├── DashboardPage.jsx
-│       │   └── HowItWorksPage.jsx
-│       │
-│       ├── App.jsx
-│       └── api.js
-│
-├── .gitignore
-└── README.md
-
 ⚙️ Local Setup
 1. Clone the repository
 git clone https://github.com/YOUR_USERNAME/dhaba-queue.git
@@ -223,12 +156,81 @@ Staff seat the customer.
 Staff track the food order.
 
 WhatsApp Integration
-
 DhabaQueue includes support for the Meta WhatsApp Cloud API and webhook-based customer intake.
 
 For local development, the application also provides a demo mode so the complete queue workflow can be demonstrated without relying on external WhatsApp message delivery.
 
-The AI processing itself runs locally through Ollama.
+The AI processing itself runs locally through Ollama
+
+
+Project Structure
+dhaba-queue/
+│
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── seed.js
+│   │
+│   ├── scripts/
+│   │   ├── generateQr.js
+│   │   └── testAi.js
+│   │
+│   └── src/
+│       ├── auth/
+│       ├── middleware/
+│       ├── queue/
+│       ├── whatsapp/
+│       ├── lib/
+│       └── server.js
+│
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── ui/
+│       │   ├── QueueBoard.jsx
+│       │   ├── TableGrid.jsx
+│       │   ├── FoodTracker.jsx
+│       │   └── AddWalkInForm.jsx
+│       │
+│       ├── pages/
+│       │   ├── HomePage.jsx
+│       │   ├── DashboardPage.jsx
+│       │   └── HowItWorksPage.jsx
+│       │
+│       ├── App.jsx
+│       └── api.js
+│
+├── .gitignore
+└── README.md
+
+
+## 🏗️ System Architecture
+
+```text
+                  Customer
+                     │
+                     │ WhatsApp
+                     ▼
+              WhatsApp Webhook
+                     │
+                     ▼
+              Node.js Backend
+                     │
+             ┌───────┴────────┐
+             │                │
+             ▼                ▼
+        Ollama AI          PostgreSQL
+             │                │
+             └───────┬────────┘
+                     │
+                     ▼
+              Socket.IO
+                     │
+                     ▼
+            Staff Dashboard
+             │      │      │
+             ▼      ▼      ▼
+           Queue  Tables  Food Orders
 
 
 
