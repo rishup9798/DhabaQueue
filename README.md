@@ -50,120 +50,42 @@ Staff can manually add customers who arrive without using WhatsApp.
 - Protected dashboard routes.
 - JWT-based authentication.
 
+---
 
+## 🏗️ System Architecture
+
+```text
+                  Customer
+                     │
+                     │ WhatsApp
+                     ▼
+              WhatsApp Webhook
+                     │
+                     ▼
+              Node.js Backend
+                     │
+             ┌───────┴────────┐
+             │                │
+             ▼                ▼
+        Ollama AI          PostgreSQL
+             │                │
+             └───────┬────────┘
+                     │
+                     ▼
+              Socket.IO
+                     │
+                     ▼
+            Staff Dashboard
+             │      │      │
+             ▼      ▼      ▼
+           Queue  Tables  Food Orders
+```
 
 ---
-⚙️ Local Setup
-1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/dhaba-queue.git
-cd dhaba-queue
-2. Install backend dependencies
-cd backend
-npm install
-3. Configure environment variables
 
-Create:
+## 📁 Project Structure
 
-backend/.env
-
-Add your local configuration:
-
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dhaba_queue"
-PORT=4000
-JWT_SECRET="your-secret"
-
-WHATSAPP_TOKEN="your-token"
-WHATSAPP_PHONE_NUMBER_ID="your-phone-number-id"
-WEBHOOK_VERIFY_TOKEN="your-verification-token"
-
-DEMO_MODE="true"
-
-Never commit .env files or API credentials to GitHub.
-
-4. Start PostgreSQL
-
-The project can be run using a local PostgreSQL instance or Docker.
-
-Example:
-
-docker run --name dhaba-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=your-password \
-  -e POSTGRES_DB=dhaba_queue \
-  -p 5432:5432 \
-  -d postgres:16
-5. Setup Prisma
-npx prisma generate
-npx prisma migrate dev
-node prisma/seed.js
-6. Start the backend
-npm run dev
-
-Backend:
-
-http://localhost:4000
-7. Start the frontend
-
-Open another terminal:
-
-cd frontend
-npm install
-npm run dev
-
-Frontend:
-
-http://localhost:5173
-🤖 Running the Local AI
-
-Install Ollama and pull the model:
-
-ollama pull llama3.2:3b
-
-Start Ollama:
-
-ollama serve
-
-The backend communicates with the local Ollama server.
-
-Example customer message:
-
-Hi, I'm Ramesh. I need a table for 4.
-
-AI extracts:
-
-{
-  "name": "Ramesh",
-  "partySize": 4
-}
-
-The backend then creates the corresponding queue entry.
-
-Demo Workflow
-
-A complete local demonstration can be performed without paid AI APIs:
-
-Start PostgreSQL.
-Start Ollama.
-Start the backend.
-Start the frontend.
-Open the dashboard.
-Simulate a WhatsApp customer message.
-Ollama extracts the customer's name and party size.
-Backend creates the queue entry.
-Customer appears on the live dashboard.
-Staff notify the customer.
-Staff seat the customer.
-Staff track the food order.
-
-WhatsApp Integration
-DhabaQueue includes support for the Meta WhatsApp Cloud API and webhook-based customer intake.
-
-For local development, the application also provides a demo mode so the complete queue workflow can be demonstrated without relying on external WhatsApp message delivery.
-
-The AI processing itself runs locally through Ollama
-
-
-Project Structure
+```text
 dhaba-queue/
 │
 ├── backend/
@@ -202,35 +124,145 @@ dhaba-queue/
 │
 ├── .gitignore
 └── README.md
+```
 
+---
 
-## 🏗️ System Architecture
+## ⚙️ Local Setup
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/dhaba-queue.git
+cd dhaba-queue
+```
+
+### 2. Install backend dependencies
+
+```bash
+cd backend
+npm install
+```
+
+### 3. Configure environment variables
+
+Create `backend/.env` and add your local configuration:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dhaba_queue"
+PORT=4000
+JWT_SECRET="your-secret"
+
+WHATSAPP_TOKEN="your-token"
+WHATSAPP_PHONE_NUMBER_ID="your-phone-number-id"
+WEBHOOK_VERIFY_TOKEN="your-verification-token"
+
+DEMO_MODE="true"
+```
+
+> ⚠️ Never commit `.env` files or API credentials to GitHub.
+
+### 4. Start PostgreSQL
+
+The project can be run using a local PostgreSQL instance or Docker.
+
+```bash
+docker run --name dhaba-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=your-password \
+  -e POSTGRES_DB=dhaba_queue \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+### 5. Set up Prisma
+
+```bash
+npx prisma generate
+npx prisma migrate dev
+node prisma/seed.js
+```
+
+### 6. Start the backend
+
+```bash
+npm run dev
+```
+
+Backend runs at: `http://localhost:4000`
+
+### 7. Start the frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs at: `http://localhost:5173`
+
+---
+
+## 🤖 Running the Local AI
+
+Install Ollama and pull the model:
+
+```bash
+ollama pull llama3.2:3b
+```
+
+Start Ollama:
+
+```bash
+ollama serve
+```
+
+The backend communicates with the local Ollama server.
+
+**Example customer message:**
 
 ```text
-                  Customer
-                     │
-                     │ WhatsApp
-                     ▼
-              WhatsApp Webhook
-                     │
-                     ▼
-              Node.js Backend
-                     │
-             ┌───────┴────────┐
-             │                │
-             ▼                ▼
-        Ollama AI          PostgreSQL
-             │                │
-             └───────┬────────┘
-                     │
-                     ▼
-              Socket.IO
-                     │
-                     ▼
-            Staff Dashboard
-             │      │      │
-             ▼      ▼      ▼
-           Queue  Tables  Food Orders
+Hi, I'm Ramesh. I need a table for 4.
+```
 
+**AI extracts:**
 
+```json
+{
+  "name": "Ramesh",
+  "partySize": 4
+}
+```
 
+The backend then creates the corresponding queue entry.
+
+---
+
+## 🎬 Demo Workflow
+
+A complete local demonstration can be performed without paid AI APIs:
+
+1. Start PostgreSQL.
+2. Start Ollama.
+3. Start the backend.
+4. Start the frontend.
+5. Open the dashboard.
+6. Simulate a WhatsApp customer message.
+7. Ollama extracts the customer's name and party size.
+8. Backend creates the queue entry.
+9. Customer appears on the live dashboard.
+10. Staff notify the customer.
+11. Staff seat the customer.
+12. Staff track the food order.
+
+---
+
+## 💬 WhatsApp Integration
+
+DhabaQueue includes support for the Meta WhatsApp Cloud API and webhook-based customer intake.
+
+For local development, the application also provides a demo mode so the complete queue workflow can be demonstrated without relying on external WhatsApp message delivery.
+
+The AI processing itself runs locally through Ollama.
