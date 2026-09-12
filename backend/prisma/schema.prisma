@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  id                  String   @id @default(uuid())
+  name                String
+  whatsappNumber      String   @unique
+  avgTurnoverMinutes  Int      @default(25)
+  createdAt           DateTime @default(now())
+
+  // Hard daily ceiling on AI (Claude) calls across ALL customers, as a
+  // backstop against runaway cost regardless of how many distinct numbers
+  // are messaging in. Resets automatically when a new day is detected.
+  aiDailyLimit        Int      @default(500)
+  aiCallsToday        Int      @default(0)
+  aiCallsResetAt      DateTime @default(now())
+
+  tables              Table[]
+  queueEntries        QueueEntry[]
+  staff               StaffUser[]
+  conversations       ConversationState[]
+}
+
+model Table {
+  id           String   @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  number       Int
+  capacity     Int
+  status       TableStatus @default(FREE)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([restaurantId, number])
+}
+
+enum TableStatus {
+  FREE
+  OCCUPIED
+}
+
+model Customer {
+  phoneNumber  String   @id
+  name         String?
+  visitCount   Int      @default(0)
+  lastVisitAt  DateTime?
+  notes        String?
+  isWalkIn     Boolean  @default(false) // true for staff-entered customers with no real WhatsApp number
+
+  // Per-customer daily AI usage cap - stops one phone number from spamming
+  // the bot into running up API cost. Resets automatically each day.
+  aiDailyLimit    Int      @default(10)
+  aiCallsToday    Int      @default(0)
+  aiCallsResetAt  DateTime @default(now())
+
+  queueEntries QueueEntry[]
+}
+
+model QueueEntry {
+  id                    String   @id @default(uuid())
+  restaurantId          String
+  restaurant            Restaurant @relation(fields: [restaurantId], references: [id])
+  customerPhoneNumber   String
+  customer              Customer @relation(fields: [customerPhoneNumber], references: [phoneNumber])
+  partySize             Int
+  status                QueueStatus @default(WAITING)
+  estimatedWaitMinutes  Int
+  joinedAt              DateTime @default(now())
+  notifiedAt            DateTime?
+  seatedAt              DateTime?
+  isAtRisk              Boolean  @default(false)
+  source                EntrySource @default(WHATSAPP)
+
+  foodOrder             FoodOrder?
+}
+
+enum EntrySource {
+  WHATSAPP
+  STAFF_MANUAL
+}
+
+enum QueueStatus {
+  WAITING
+  NOTIFIED
+  SEATED
+  CANCELLED
+  NO_SHOW
+}
+
+// Tracks where each phone number is in the WhatsApp conversation flow,
+// so the bot knows how to interpret the next incoming message.
+model ConversationState {
+  phoneNumber   String   @id
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  step          ConversationStep @default(AWAITING_NAME)
+  updatedAt     DateTime @updatedAt
+}
+
+enum ConversationStep {
+  AWAITING_NAME
+  AWAITING_PARTY_SIZE
+  IN_QUEUE
+}
+
+model StaffUser {
+  id           String   @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+// One food order per queue entry, created once a party is seated. Tracks
+// kitchen prep status independently of the queue status, so staff can see
+// "seated but still waiting on food" as a distinct state from "waiting for
+// a table."
+model FoodOrder {
+  id            String   @id @default(uuid())
+  queueEntryId  String   @unique
+  queueEntry    QueueEntry @relation(fields: [queueEntryId], references: [id])
+  itemsSummary  String   // free-text, e.g. "2x thali, 1x lassi" - kept simple, not a full menu system
+  status        FoodStatus @default(ORDERED)
+  readyNotifiedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum FoodStatus {
+  ORDERED
+  PREPARING
+  READY
+  SERVED
+}

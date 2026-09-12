@@ -1,0 +1,1 @@
+import { prisma } from "./src/lib/prisma.js"; await prisma.restaurant.update({ where: { id: "1de4e337-29c5-46ad-b180-6fa68520ecea" }, data: { whatsappNumber: "1323952960798834" } }); console.log("Restaurant updated successfully"); await prisma.$disconnect();

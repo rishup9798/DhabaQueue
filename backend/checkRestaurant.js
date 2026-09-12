@@ -1,0 +1,1 @@
+import { prisma } from "./src/lib/prisma.js"; const restaurants = await prisma.restaurant.findMany({ select: { id: true, name: true, whatsappNumber: true } }); console.log(restaurants); await prisma.$disconnect();
