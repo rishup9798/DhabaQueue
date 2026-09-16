@@ -10,6 +10,9 @@
     "generate:qr": "node scripts/generateQr.js",
     "test": "node --test src/**/__tests__/*.test.js"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "dependencies": {
     "@prisma/client": "^5.18.0",
     "axios": "^1.7.2",
