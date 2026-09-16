@@ -1,13 +1,48 @@
-import axios from "axios";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const API_BASE_URL = "https://dhabaqueue-api.onrender.com";
 
 export function createApiClient(token) {
-  const client = axios.create({
-    baseURL: BASE_URL,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  return client;
-}
+  return {
+    async request(path, options = {}) {
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(options.headers || {}),
+        },
+      });
 
-export const API_BASE_URL = BASE_URL;
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Request failed");
+      }
+
+      return data;
+    },
+
+    get(path) {
+      return this.request(path);
+    },
+
+    post(path, body) {
+      return this.request(path, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+
+    patch(path, body) {
+      return this.request(path, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+    },
+
+    delete(path) {
+      return this.request(path, {
+        method: "DELETE",
+      });
+    },
+  };
+}
