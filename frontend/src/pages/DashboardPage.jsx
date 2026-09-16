@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [entries, setEntries] = useState([]);
   const [tables, setTables] = useState([]);
   const [foodOrders, setFoodOrders] = useState([]);
+const [foodHistory, setFoodHistory] = useState([]);
+
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
@@ -35,11 +37,13 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      const [queueRes, tablesRes, foodRes] = await Promise.all([
-        api.get("/api/queue"),
-        api.get("/api/queue/tables/all"),
-        api.get("/api/queue/food-orders"),
-      ]);
+      const [queueRes, tablesRes, foodRes, historyRes] =
+  await Promise.all([
+    api.get("/api/queue"),
+    api.get("/api/queue/tables/all"),
+    api.get("/api/queue/food-orders"),
+    api.get("/api/queue/food-orders/history"),
+  ]);
 
       const queueData = Array.isArray(queueRes)
         ? queueRes
@@ -59,14 +63,22 @@ export default function DashboardPage() {
           ? foodRes.data
           : [];
 
+      const historyData = Array.isArray(historyRes)
+        ? historyRes
+        : Array.isArray(historyRes?.data)
+          ? historyRes.data
+          : [];
+
       setEntries(queueData);
       setTables(tablesData);
       setFoodOrders(foodData);
+      setFoodHistory(historyData);
     } catch (error) {
       console.error("Failed to load dashboard:", error);
       setEntries([]);
       setTables([]);
       setFoodOrders([]);
+      setFoodHistory([]);
     } finally {
       setLoading(false);
     }
@@ -125,10 +137,7 @@ export default function DashboardPage() {
     await loadData();
   }
 
-  async function handleToggleTable(id) {
-    await api.patch(`/api/queue/tables/${id}/toggle`);
-    await loadData();
-  }
+
 
   async function handleAddWalkIn(data) {
     await api.post("/api/queue/manual", data);
@@ -404,10 +413,7 @@ export default function DashboardPage() {
 
               </div>
 
-              <TableGrid
-                tables={tables}
-                onToggle={handleToggleTable}
-              />
+              <TableGrid tables={tables} />
 
             </div>
 
@@ -425,6 +431,7 @@ export default function DashboardPage() {
 
               <FoodTracker
                 orders={foodOrders}
+                history={foodHistory}
                 onUpdateItems={handleUpdateFoodItems}
                 onAdvanceStatus={handleAdvanceFoodStatus}
               />

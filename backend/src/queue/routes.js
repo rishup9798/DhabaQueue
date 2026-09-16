@@ -7,7 +7,6 @@ import { estimateWaitMinutes } from "./estimator.js";
 
 const router = express.Router();
 
-// All routes here are staff-only.
 router.use(requireAuth);
 
 function broadcastQueueUpdate(req, restaurantId) {
@@ -15,173 +14,518 @@ function broadcastQueueUpdate(req, restaurantId) {
   io.to(`restaurant:${restaurantId}`).emit("queue:updated");
 }
 
-// GET /api/queue - the live waiting list for the logged-in staff member's restaurant
-router.get("/", asyncHandler(async (req, res) => {
-  const entries = await prisma.queueEntry.findMany({
-    where: { restaurantId: req.staff.restaurantId, status: "WAITING" },
-    orderBy: { joinedAt: "asc" },
-    include: { customer: true },
-  });
-  res.json(entries);
-}));
+// GET /api/queue
+// Returns the active queue in FCFS order.
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    const entries = await prisma.queueEntry.findMany({
+      where: {
+        restaurantId: req.staff.restaurantId,
+        status: {
+          in: ["WAITING", "NOTIFIED", "SEATED"],
+        },
+      },
+      orderBy: {
+        joinedAt: "asc",
+      },
+      include: {
+        customer: true,
+        table: true,
+        foodOrder: true,
+      },
+    });
 
-// POST /api/queue/manual - staff adds a walk-in directly from the dashboard,
-// for customers who don't want to (or can't) use WhatsApp. Phone is optional;
-// if omitted, a synthetic identifier is used so the DB's phone-based identity
-// model still works, but no WhatsApp messages can be sent to that entry.
-router.post("/manual", asyncHandler(async (req, res) => {
-  const { name, partySize, phoneNumber } = req.body;
+    res.json(entries);
+  })
+);
 
-  if (!name || !partySize) {
-    return res.status(400).json({ error: "name and partySize are required" });
-  }
-  if (!Number.isInteger(partySize) || partySize < 1 || partySize > 30) {
-    return res.status(400).json({ error: "partySize must be a whole number between 1 and 30" });
-  }
+// POST /api/queue/manual
+// Staff manually adds a walk-in.
+router.post(
+  "/manual",
+  asyncHandler(async (req, res) => {
+    const { name, partySize, phoneNumber } = req.body;
 
-  const restaurantId = req.staff.restaurantId;
-  const isWalkIn = !phoneNumber;
-  const identifier = phoneNumber || `walkin:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    if (!name || !partySize) {
+      return res.status(400).json({
+        error: "name and partySize are required",
+      });
+    }
 
-  await prisma.customer.upsert({
-    where: { phoneNumber: identifier },
-    update: { name, visitCount: { increment: 1 }, lastVisitAt: new Date() },
-    create: { phoneNumber: identifier, name, visitCount: 1, lastVisitAt: new Date(), isWalkIn },
-  });
+    if (
+      !Number.isInteger(partySize) ||
+      partySize < 1 ||
+      partySize > 30
+    ) {
+      return res.status(400).json({
+        error: "partySize must be a whole number between 1 and 30",
+      });
+    }
 
-  const estimatedWaitMinutes = await estimateWaitMinutes(restaurantId, partySize);
+    const restaurantId = req.staff.restaurantId;
 
-  const entry = await prisma.queueEntry.create({
-    data: {
+    const isWalkIn = !phoneNumber;
+
+    const identifier =
+      phoneNumber ||
+      `walkin:${Date.now()}:${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+    await prisma.customer.upsert({
+      where: {
+        phoneNumber: identifier,
+      },
+      update: {
+        name,
+        visitCount: {
+          increment: 1,
+        },
+        lastVisitAt: new Date(),
+      },
+      create: {
+        phoneNumber: identifier,
+        name,
+        visitCount: 1,
+        lastVisitAt: new Date(),
+        isWalkIn,
+      },
+    });
+
+    const estimatedWaitMinutes = await estimateWaitMinutes(
       restaurantId,
-      customerPhoneNumber: identifier,
-      partySize,
-      estimatedWaitMinutes,
-      status: "WAITING",
-      source: "STAFF_MANUAL",
-    },
-    include: { customer: true },
-  });
-
-  broadcastQueueUpdate(req, restaurantId);
-  res.status(201).json(entry);
-}));
-
-// PATCH /api/queue/:id/notify - tell the customer their table is ready.
-// Skipped for walk-ins with no real WhatsApp number - staff just calls them.
-router.patch("/:id/notify", asyncHandler(async (req, res) => {
-  const entry = await prisma.queueEntry.update({
-    where: { id: req.params.id },
-    data: { status: "NOTIFIED", notifiedAt: new Date() },
-    include: { customer: true },
-  });
-
-  if (!entry.customer.isWalkIn) {
-    await sendWhatsAppMessage(
-      entry.customerPhoneNumber,
-      "Your table is ready! Please head to the counter. 🎉"
+      partySize
     );
-  }
 
-  broadcastQueueUpdate(req, entry.restaurantId);
-  res.json(entry);
-}));
+    const entry = await prisma.queueEntry.create({
+      data: {
+        restaurantId,
+        customerPhoneNumber: identifier,
+        partySize,
+        estimatedWaitMinutes,
+        status: "WAITING",
+        source: "STAFF_MANUAL",
+      },
+      include: {
+        customer: true,
+      },
+    });
 
-// PATCH /api/queue/:id/seat - mark seated, frees up capacity for the next
-// estimate, and creates an empty food order ready for staff to fill in.
-router.patch("/:id/seat", asyncHandler(async (req, res) => {
-  const entry = await prisma.queueEntry.update({
-    where: { id: req.params.id },
-    data: { status: "SEATED", seatedAt: new Date() },
-  });
+    broadcastQueueUpdate(req, restaurantId);
 
-  await prisma.foodOrder.upsert({
-    where: { queueEntryId: entry.id },
-    update: {},
-    create: { queueEntryId: entry.id, itemsSummary: "", status: "ORDERED" },
-  });
+    res.status(201).json(entry);
+  })
+);
 
-  broadcastQueueUpdate(req, entry.restaurantId);
-  res.json(entry);
-}));
+// PATCH /api/queue/:id/notify
+// Notify the next customer that their table is ready.
+router.patch(
+  "/:id/notify",
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.queueEntry.findFirst({
+      where: {
+        id: req.params.id,
+        restaurantId: req.staff.restaurantId,
+        status: "WAITING",
+      },
+      include: {
+        customer: true,
+      },
+    });
 
-// PATCH /api/queue/:id/remove - no-show or manual removal
-router.patch("/:id/remove", asyncHandler(async (req, res) => {
-  const entry = await prisma.queueEntry.update({
-    where: { id: req.params.id },
-    data: { status: "NO_SHOW" },
-  });
-  broadcastQueueUpdate(req, entry.restaurantId);
-  res.json(entry);
-}));
+    if (!entry) {
+      return res.status(404).json({
+        error: "Queue entry not found or already notified",
+      });
+    }
 
-// GET /api/tables - table grid for the dashboard's second view
-router.get("/tables/all", asyncHandler(async (req, res) => {
-  const tables = await prisma.table.findMany({
-    where: { restaurantId: req.staff.restaurantId },
-    orderBy: { number: "asc" },
-  });
-  res.json(tables);
-}));
+    const updated = await prisma.queueEntry.update({
+      where: {
+        id: entry.id,
+      },
+      data: {
+        status: "NOTIFIED",
+        notifiedAt: new Date(),
+      },
+      include: {
+        customer: true,
+      },
+    });
 
-// PATCH /api/tables/:id/toggle - flip a table between free/occupied
-router.patch("/tables/:id/toggle", asyncHandler(async (req, res) => {
-  const table = await prisma.table.findUnique({ where: { id: req.params.id } });
-  if (!table) {
-    return res.status(404).json({ error: "Table not found" });
-  }
-  const updated = await prisma.table.update({
-    where: { id: req.params.id },
-    data: { status: table.status === "FREE" ? "OCCUPIED" : "FREE" },
-  });
-  broadcastQueueUpdate(req, updated.restaurantId);
-  res.json(updated);
-}));
+    if (!entry.customer.isWalkIn) {
+      await sendWhatsAppMessage(
+        entry.customerPhoneNumber,
+        "Your table is ready! Please head to the counter. 🎉"
+      );
+    }
 
-// GET /api/queue/food-orders - all in-progress food orders for seated tables
-router.get("/food-orders", asyncHandler(async (req, res) => {
-  const orders = await prisma.foodOrder.findMany({
-    where: {
-      status: { not: "SERVED" },
-      queueEntry: { restaurantId: req.staff.restaurantId },
-    },
-    include: { queueEntry: { include: { customer: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  res.json(orders);
-}));
+    broadcastQueueUpdate(req, entry.restaurantId);
 
-// PATCH /api/queue/food-orders/:id - update items and/or status. When status
-// flips to READY, proactively notifies the customer over WhatsApp (skipped
-// for walk-ins without a real number).
-router.patch("/food-orders/:id", asyncHandler(async (req, res) => {
-  const { itemsSummary, status } = req.body;
+    res.json(updated);
+  })
+);
 
-  const existing = await prisma.foodOrder.findUnique({
-    where: { id: req.params.id },
-    include: { queueEntry: { include: { customer: true } } },
-  });
-  if (!existing) return res.status(404).json({ error: "Food order not found" });
+// PATCH /api/queue/:id/seat
+// Automatically selects the smallest suitable FREE table.
+router.patch(
+  "/:id/seat",
+  asyncHandler(async (req, res) => {
+    const restaurantId = req.staff.restaurantId;
 
-  const updated = await prisma.foodOrder.update({
-    where: { id: req.params.id },
-    data: {
-      ...(itemsSummary !== undefined ? { itemsSummary } : {}),
-      ...(status !== undefined ? { status } : {}),
-      ...(status === "READY" ? { readyNotifiedAt: new Date() } : {}),
-    },
-  });
+    const entry = await prisma.queueEntry.findFirst({
+      where: {
+        id: req.params.id,
+        restaurantId,
+        status: "NOTIFIED",
+      },
+      include: {
+        customer: true,
+      },
+    });
 
-  const justBecameReady = status === "READY" && existing.status !== "READY";
-  if (justBecameReady && !existing.queueEntry.customer.isWalkIn) {
-    await sendWhatsAppMessage(
-      existing.queueEntry.customerPhoneNumber,
-      "Your food is ready! 🍽️ Enjoy your meal."
+    if (!entry) {
+      return res.status(404).json({
+        error:
+          "Queue entry not found or customer is not ready to be seated",
+      });
+    }
+
+    // Find the smallest available table that can accommodate
+    // the complete party.
+    const availableTables = await prisma.table.findMany({
+      where: {
+        restaurantId,
+        status: "FREE",
+        capacity: {
+          gte: entry.partySize,
+        },
+      },
+      orderBy: [
+        {
+          capacity: "asc",
+        },
+        {
+          number: "asc",
+        },
+      ],
+    });
+
+    const table = availableTables[0];
+
+    if (!table) {
+      return res.status(409).json({
+        error: `No suitable table is currently available for ${entry.partySize} guests`,
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Occupy the selected table.
+      const updatedTable = await tx.table.update({
+        where: {
+          id: table.id,
+        },
+        data: {
+          status: "OCCUPIED",
+        },
+      });
+
+      // Seat the customer and remember the table assignment.
+      const updatedEntry = await tx.queueEntry.update({
+        where: {
+          id: entry.id,
+        },
+        data: {
+          status: "SEATED",
+          seatedAt: new Date(),
+          tableId: table.id,
+        },
+        include: {
+          customer: true,
+          table: true,
+        },
+      });
+
+      // Automatically create an empty food order.
+      const foodOrder = await tx.foodOrder.upsert({
+        where: {
+          queueEntryId: entry.id,
+        },
+        update: {},
+        create: {
+          queueEntryId: entry.id,
+          itemsSummary: "",
+          status: "ORDERED",
+        },
+      });
+
+      return {
+        entry: updatedEntry,
+        table: updatedTable,
+        foodOrder,
+      };
+    });
+
+    broadcastQueueUpdate(req, restaurantId);
+
+    res.json(result.entry);
+  })
+);
+
+// PATCH /api/queue/:id/remove
+// Mark a waiting customer as a no-show.
+router.patch(
+  "/:id/remove",
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.queueEntry.findFirst({
+      where: {
+        id: req.params.id,
+        restaurantId: req.staff.restaurantId,
+        status: {
+          in: ["WAITING", "NOTIFIED"],
+        },
+      },
+    });
+
+    if (!entry) {
+      return res.status(404).json({
+        error: "Queue entry not found",
+      });
+    }
+
+    const updated = await prisma.queueEntry.update({
+      where: {
+        id: entry.id,
+      },
+      data: {
+        status: "NO_SHOW",
+      },
+    });
+
+    broadcastQueueUpdate(req, entry.restaurantId);
+
+    res.json(updated);
+  })
+);
+
+// GET /api/queue/tables/all
+// Returns all tables with their currently seated customer.
+router.get(
+  "/tables/all",
+  asyncHandler(async (req, res) => {
+    const tables = await prisma.table.findMany({
+      where: {
+        restaurantId: req.staff.restaurantId,
+      },
+      orderBy: {
+        number: "asc",
+      },
+      include: {
+        queueEntries: {
+          where: {
+            status: "SEATED",
+          },
+          orderBy: {
+            seatedAt: "desc",
+          },
+          take: 1,
+          include: {
+            customer: true,
+            foodOrder: true,
+          },
+        },
+      },
+    });
+
+    res.json(tables);
+  })
+);
+
+// GET /api/queue/food-orders
+// Returns active food orders.
+router.get(
+  "/food-orders",
+  asyncHandler(async (req, res) => {
+    const orders = await prisma.foodOrder.findMany({
+      where: {
+        status: {
+          not: "SERVED",
+        },
+        queueEntry: {
+          restaurantId: req.staff.restaurantId,
+        },
+      },
+      include: {
+        queueEntry: {
+          include: {
+            customer: true,
+            table: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    res.json(orders);
+  })
+);
+
+// GET /api/queue/food-orders/history
+// Returns served food orders.
+router.get(
+  "/food-orders/history",
+  asyncHandler(async (req, res) => {
+    const orders = await prisma.foodOrder.findMany({
+      where: {
+        status: "SERVED",
+        queueEntry: {
+          restaurantId: req.staff.restaurantId,
+        },
+      },
+      include: {
+        queueEntry: {
+          include: {
+            customer: true,
+            table: true,
+          },
+        },
+      },
+      orderBy: {
+        servedAt: "desc",
+      },
+    });
+
+    res.json(orders);
+  })
+);
+
+// PATCH /api/queue/food-orders/:id
+// Staff updates food items/status.
+router.patch(
+  "/food-orders/:id",
+  asyncHandler(async (req, res) => {
+    const { itemsSummary, status } = req.body;
+
+    const existing = await prisma.foodOrder.findUnique({
+      where: {
+        id: req.params.id,
+      },
+      include: {
+        queueEntry: {
+          include: {
+            customer: true,
+            table: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        error: "Food order not found",
+      });
+    }
+
+    if (
+      existing.queueEntry.restaurantId !== req.staff.restaurantId
+    ) {
+      return res.status(403).json({
+        error: "You do not have access to this food order",
+      });
+    }
+
+    const justBecameReady =
+      status === "READY" && existing.status !== "READY";
+
+    const justBecameServed =
+      status === "SERVED" && existing.status !== "SERVED";
+
+    if (status === "SERVED") {
+      if (!existing.queueEntry.tableId) {
+        return res.status(400).json({
+          error: "Cannot complete order because no table is assigned",
+        });
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.foodOrder.update({
+          where: {
+            id: existing.id,
+          },
+          data: {
+            ...(itemsSummary !== undefined
+              ? { itemsSummary }
+              : {}),
+            status: "SERVED",
+            servedAt: new Date(),
+          },
+        });
+
+        await tx.queueEntry.update({
+          where: {
+            id: existing.queueEntryId,
+          },
+          data: {
+            status: "COMPLETED",
+          },
+        });
+
+        await tx.table.update({
+          where: {
+            id: existing.queueEntry.tableId,
+          },
+          data: {
+            status: "FREE",
+          },
+        });
+
+        return updatedOrder;
+      });
+
+      broadcastQueueUpdate(
+        req,
+        existing.queueEntry.restaurantId
+      );
+
+      return res.json(result);
+    }
+
+    const updated = await prisma.foodOrder.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        ...(itemsSummary !== undefined
+          ? { itemsSummary }
+          : {}),
+        ...(status !== undefined
+          ? { status }
+          : {}),
+        ...(status === "READY"
+          ? { readyNotifiedAt: new Date() }
+          : {}),
+      },
+    });
+
+    if (
+      justBecameReady &&
+      !existing.queueEntry.customer.isWalkIn
+    ) {
+      await sendWhatsAppMessage(
+        existing.queueEntry.customerPhoneNumber,
+        "Your food is ready! 🍽️ Enjoy your meal."
+      );
+    }
+
+    broadcastQueueUpdate(
+      req,
+      existing.queueEntry.restaurantId
     );
-  }
 
-  broadcastQueueUpdate(req, existing.queueEntry.restaurantId);
-  res.json(updated);
-}));
+    res.json(updated);
+  })
+);
 
 export default router;
