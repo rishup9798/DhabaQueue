@@ -15,12 +15,14 @@ export default function DashboardPage() {
   );
 
   const [restaurantId, setRestaurantId] = useState(() =>
+    localStorage.getItem("queuechat_restaurant_id") ||
     localStorage.getItem("queuechat_restaurant")
   );
 
   const [entries, setEntries] = useState([]);
   const [tables, setTables] = useState([]);
   const [foodOrders, setFoodOrders] = useState([]);
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [loading, setLoading] = useState(false);
@@ -39,34 +41,61 @@ export default function DashboardPage() {
         api.get("/api/queue/food-orders"),
       ]);
 
-      setEntries(queueRes.data);
-      setTables(tablesRes.data);
-      setFoodOrders(foodRes.data);
+      const queueData = Array.isArray(queueRes)
+        ? queueRes
+        : Array.isArray(queueRes?.data)
+          ? queueRes.data
+          : [];
+
+      const tablesData = Array.isArray(tablesRes)
+        ? tablesRes
+        : Array.isArray(tablesRes?.data)
+          ? tablesRes.data
+          : [];
+
+      const foodData = Array.isArray(foodRes)
+        ? foodRes
+        : Array.isArray(foodRes?.data)
+          ? foodRes.data
+          : [];
+
+      setEntries(queueData);
+      setTables(tablesData);
+      setFoodOrders(foodData);
     } catch (error) {
       console.error("Failed to load dashboard:", error);
+      setEntries([]);
+      setTables([]);
+      setFoodOrders([]);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    if (!token || !restaurantId) return;
+    if (!token) return;
 
     loadData();
 
-    const socket = io(API_BASE_URL);
+    if (!restaurantId) return;
+
+    const socket = io(API_BASE_URL, {
+  transports: ["polling"],
+});
 
     socket.emit("join-restaurant", restaurantId);
+
     socket.on("queue:updated", loadData);
 
     return () => {
+      socket.off("queue:updated", loadData);
       socket.disconnect();
     };
   }, [token, restaurantId, loadData]);
 
   function handleLoggedIn(newToken, newRestaurantId) {
     localStorage.setItem("queuechat_token", newToken);
-    localStorage.setItem("queuechat_restaurant", newRestaurantId);
+    localStorage.setItem("queuechat_restaurant_id", newRestaurantId);
 
     setToken(newToken);
     setRestaurantId(newRestaurantId);
@@ -74,6 +103,7 @@ export default function DashboardPage() {
 
   function handleLogout() {
     localStorage.removeItem("queuechat_token");
+    localStorage.removeItem("queuechat_restaurant_id");
     localStorage.removeItem("queuechat_restaurant");
 
     setToken(null);
@@ -163,8 +193,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#0f0f0e] text-white">
 
-      {/* TOP BAR */}
-
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0f0f0e]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
 
@@ -180,7 +208,6 @@ export default function DashboardPage() {
 
               <div className="mt-0.5 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-green-500" />
-
                 <span className="text-xs text-white/50">
                   Live operations
                 </span>
@@ -189,7 +216,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-
             <button
               onClick={loadData}
               className="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/10 hover:text-white sm:block"
@@ -203,16 +229,12 @@ export default function DashboardPage() {
             >
               Sign out
             </button>
-
           </div>
+
         </div>
       </header>
 
-      {/* MAIN */}
-
       <main className="mx-auto max-w-7xl px-5 pb-32 pt-7">
-
-        {/* WELCOME */}
 
         <div className="mb-7">
           <p className="text-sm text-white/40">
@@ -227,8 +249,6 @@ export default function DashboardPage() {
             Keep an eye on your queue, tables and orders.
           </p>
         </div>
-
-        {/* STATS */}
 
         <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
 
@@ -263,15 +283,9 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* DASHBOARD GRID */}
-
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
 
-          {/* LEFT */}
-
           <section className="min-w-0">
-
-            {/* QUEUE HEADER */}
 
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -285,22 +299,14 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-
-                <div className="relative">
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search guest..."
-                    className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-[#e3a008]/50"
-                  />
-                </div>
-
-              </div>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search guest..."
+                className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-[#e3a008]/50"
+              />
 
             </div>
-
-            {/* FILTERS */}
 
             <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
 
@@ -325,9 +331,7 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* QUEUE */}
-
-            <div className="rounded-2xl border border-white/10 bg-[#171715] p-4 shadow-xl">
+            <div className="rounded-2xl border border-white/10 bg-[#171715] p-4">
 
               {filteredEntries.length === 0 ? (
                 <div className="flex min-h-[260px] flex-col items-center justify-center text-center">
@@ -337,9 +341,7 @@ export default function DashboardPage() {
                   </div>
 
                   <h4 className="font-semibold">
-                    {search
-                      ? "No guests found"
-                      : "Queue is empty"}
+                    {search ? "No guests found" : "Queue is empty"}
                   </h4>
 
                   <p className="mt-1 max-w-xs text-xs text-white/35">
@@ -359,8 +361,6 @@ export default function DashboardPage() {
               )}
 
             </div>
-
-            {/* ADD WALK-IN */}
 
             <div className="mt-6">
 
@@ -382,15 +382,12 @@ export default function DashboardPage() {
 
           </section>
 
-          {/* RIGHT SIDEBAR */}
-
           <aside className="space-y-6">
-
-            {/* TABLES */}
 
             <div className="rounded-2xl border border-white/10 bg-[#171715] p-5">
 
               <div className="mb-4 flex items-center justify-between">
+
                 <div>
                   <h3 className="font-semibold">
                     Tables
@@ -404,6 +401,7 @@ export default function DashboardPage() {
                 <span className="rounded-full bg-green-500/10 px-2.5 py-1 text-xs text-green-400">
                   {availableTables} free
                 </span>
+
               </div>
 
               <TableGrid
@@ -412,8 +410,6 @@ export default function DashboardPage() {
               />
 
             </div>
-
-            {/* FOOD */}
 
             <div className="rounded-2xl border border-white/10 bg-[#171715] p-5">
 
