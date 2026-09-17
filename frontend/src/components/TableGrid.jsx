@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { createApiClient } from "../api.js";
 
-export default function TableGrid({ tables = [], onAddTable }) {
+export default function TableGrid({ tables = [] }) {
   const [number, setNumber] = useState("");
   const [capacity, setCapacity] = useState("2");
   const [error, setError] = useState("");
@@ -23,9 +24,14 @@ export default function TableGrid({ tables = [], onAddTable }) {
 
     setAdding(true);
     try {
-      await onAddTable({ number: tableNumber, capacity: tableCapacity });
+      const token = localStorage.getItem("queuechat_token");
+      await createApiClient(token).post("/api/queue/tables", {
+        number: tableNumber,
+        capacity: tableCapacity,
+      });
       setNumber("");
       setCapacity("2");
+      window.location.reload();
     } catch (err) {
       setError(err.message || "Couldn't add table.");
     } finally {
