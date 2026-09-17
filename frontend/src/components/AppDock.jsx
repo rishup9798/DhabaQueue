@@ -5,6 +5,7 @@ import {
   Utensils,
   Info,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import {
   Dock,
@@ -14,31 +15,11 @@ import {
 } from "./ui/dock.jsx";
 
 const items = [
-  {
-    title: "Home",
-    icon: <Home />,
-    href: "/",
-  },
-  {
-    title: "Dashboard",
-    icon: <LayoutDashboard />,
-    href: "/dashboard",
-  },
-  {
-    title: "Queue",
-    icon: <ListOrdered />,
-    href: "/dashboard",
-  },
-  {
-    title: "Food",
-    icon: <Utensils />,
-    href: "/dashboard",
-  },
-  {
-    title: "How It Works",
-    icon: <Info />,
-    href: "/how-it-works",
-  },
+  { title: "Home", icon: <Home />, href: "/" },
+  { title: "Dashboard", icon: <LayoutDashboard />, href: "/dashboard" },
+  { title: "Queue", icon: <ListOrdered />, href: "/dashboard" },
+  { title: "Food", icon: <Utensils />, href: "/dashboard" },
+  { title: "How It Works", icon: <Info />, href: "/how-it-works" },
 ];
 
 export default function AppDock() {
@@ -50,17 +31,15 @@ export default function AppDock() {
             key={item.title}
             className="aspect-square rounded-full bg-zinc-800 text-white transition-colors hover:bg-amber-500"
           >
-            <DockLabel>
-              {item.title}
-            </DockLabel>
-
+            <DockLabel>{item.title}</DockLabel>
             <DockIcon>
-              <a
-                href={item.href}
+              <Link
+                to={item.href}
                 className="flex h-full w-full items-center justify-center"
+                aria-label={item.title}
               >
                 {item.icon}
-              </a>
+              </Link>
             </DockIcon>
           </DockItem>
         ))}
