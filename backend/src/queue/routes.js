@@ -48,27 +48,59 @@ router.get("/", requireAuth, async (req, res) => {
 ========================= */
 router.post("/manual", requireAuth, async (req, res) => {
   try {
-    const { name, phoneNumber, partySize } = req.body;
+    const { name, partySize, phoneNumber } = req.body;
 
-    if (!name || !phoneNumber || !partySize) {
+    if (!name || !partySize) {
       return res.status(400).json({
-        error: "Name, phone number and party size are required",
+        error: "name and partySize are required",
+      });
+    }
+
+    const parsedPartySize = Number(partySize);
+
+    if (
+      !Number.isInteger(parsedPartySize) ||
+      parsedPartySize < 1 ||
+      parsedPartySize > 30
+    ) {
+      return res.status(400).json({
+        error: "partySize must be a whole number between 1 and 30",
       });
     }
 
     const restaurantId = req.staff.restaurantId;
 
+    const isWalkIn = !phoneNumber;
+
+    const identifier =
+      phoneNumber ||
+      `walkin:${Date.now()}:${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
     const customer = await prisma.customer.upsert({
       where: {
-        phoneNumber,
+        phoneNumber: identifier,
       },
       update: {
         name,
+        visitCount: {
+          increment: 1,
+        },
+        lastVisitAt: new Date(),
       },
       create: {
-        phoneNumber,
+        phoneNumber: identifier,
         name,
-        isWalkIn: true,
+        visitCount: 1,
+        lastVisitAt: new Date(),
+        isWalkIn,
+      },
+    });
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: {
+        id: restaurantId,
       },
     });
 
@@ -81,12 +113,6 @@ router.post("/manual", requireAuth, async (req, res) => {
       },
     });
 
-    const restaurant = await prisma.restaurant.findUnique({
-      where: {
-        id: restaurantId,
-      },
-    });
-
     const estimatedWaitMinutes =
       waitingCount * (restaurant?.avgTurnoverMinutes || 25);
 
@@ -94,8 +120,9 @@ router.post("/manual", requireAuth, async (req, res) => {
       data: {
         restaurantId,
         customerPhoneNumber: customer.phoneNumber,
-        partySize: Number(partySize),
+        partySize: parsedPartySize,
         estimatedWaitMinutes,
+        status: "WAITING",
         source: "STAFF_MANUAL",
       },
       include: {
@@ -110,7 +137,10 @@ router.post("/manual", requireAuth, async (req, res) => {
     res.status(201).json(entry);
   } catch (error) {
     console.error("MANUAL QUEUE ERROR:", error);
-    res.status(500).json({ error: "Failed to add customer" });
+
+    res.status(500).json({
+      error: "Failed to add customer",
+    });
   }
 });
 
