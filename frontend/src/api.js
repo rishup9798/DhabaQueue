@@ -1,24 +1,49 @@
-export const API_BASE_URL = "https://dhabaqueue-api.onrender.com";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "https://dhabaqueue-api.onrender.com";
+
+export { API_BASE_URL };
 
 export function createApiClient(token) {
   return {
     async request(path, options = {}) {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(options.headers || {}),
-        },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-      const data = await response.json().catch(() => ({}));
+      try {
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(options.headers || {}),
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || "Request failed");
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || `Request failed (${response.status})`
+          );
+        }
+
+        return data;
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          throw new Error("Server took too long to respond");
+        }
+
+        if (error instanceof TypeError) {
+          throw new Error(
+            `Cannot reach DhabaQueue backend at ${API_BASE_URL}`
+          );
+        }
+
+        throw error;
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return data;
     },
 
     get(path) {
