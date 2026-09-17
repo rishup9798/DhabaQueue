@@ -5,24 +5,31 @@ import {
   Utensils,
   Info,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import {
-  Dock,
-  DockIcon,
-  DockItem,
-  DockLabel,
-} from "./ui/dock.jsx";
+import { Dock, DockIcon, DockItem, DockLabel } from "./ui/dock.jsx";
 
 const items = [
   { title: "Home", icon: <Home />, href: "/" },
   { title: "Dashboard", icon: <LayoutDashboard />, href: "/dashboard" },
-  { title: "Queue", icon: <ListOrdered />, href: "/dashboard" },
-  { title: "Food", icon: <Utensils />, href: "/dashboard" },
+  { title: "Queue", icon: <ListOrdered />, href: "/dashboard", section: "queue" },
+  { title: "Food", icon: <Utensils />, href: "/dashboard", section: "food" },
   { title: "How It Works", icon: <Info />, href: "/how-it-works" },
 ];
 
 export default function AppDock() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  function handleSectionClick(section) {
+    if (location.pathname !== "/dashboard") {
+      navigate("/dashboard");
+      window.setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+      return;
+    }
+    document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2">
       <Dock className="items-end pb-3">
@@ -33,13 +40,24 @@ export default function AppDock() {
           >
             <DockLabel>{item.title}</DockLabel>
             <DockIcon>
-              <Link
-                to={item.href}
-                className="flex h-full w-full items-center justify-center"
-                aria-label={item.title}
-              >
-                {item.icon}
-              </Link>
+              {item.section ? (
+                <button
+                  type="button"
+                  onClick={() => handleSectionClick(item.section)}
+                  className="flex h-full w-full items-center justify-center"
+                  aria-label={item.title}
+                >
+                  {item.icon}
+                </button>
+              ) : (
+                <Link
+                  to={item.href}
+                  className="flex h-full w-full items-center justify-center"
+                  aria-label={item.title}
+                >
+                  {item.icon}
+                </Link>
+              )}
             </DockIcon>
           </DockItem>
         ))}
