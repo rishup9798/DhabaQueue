@@ -17,6 +17,18 @@ const items = [
   { title: "How It Works", icon: <Info />, href: "/how-it-works" },
 ];
 
+function scrollToSection(section) {
+  if (section === "queue") {
+    document.querySelector("main section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  if (section === "food") {
+    const cards = document.querySelectorAll("main aside > div");
+    cards[cards.length - 1]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 export default function AppDock() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,10 +36,10 @@ export default function AppDock() {
   function handleSectionClick(section) {
     if (location.pathname !== "/dashboard") {
       navigate("/dashboard");
-      window.setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+      window.setTimeout(() => scrollToSection(section), 300);
       return;
     }
-    document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollToSection(section);
   }
 
   return (
