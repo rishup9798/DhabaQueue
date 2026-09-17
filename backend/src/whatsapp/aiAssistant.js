@@ -1,10 +1,10 @@
 import "dotenv/config";
 
-const OLLAMA_API_URL = "http://127.0.0.1:11434/api/chat";
-const OLLAMA_MODEL = "llama3.2:3b";
+const AI_BASE_URL = (process.env.AI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 export function isAiEnabled() {
-  return true;
+  return Boolean(process.env.AI_API_KEY);
 }
 
 export async function extractIntakeDetails(message) {
@@ -16,15 +16,14 @@ Return ONLY valid JSON:
 Rules:
 - name must be the customer's actual name if clearly provided, otherwise null
 - partySize must be the number of people if clearly provided, otherwise null
+- understand natural language, Hindi, Hinglish, and English
 - never guess
 - partySize must be an integer between 1 and 30
-- do not add markdown
-- do not add explanations`;
+- do not add markdown or explanations`;
 
   try {
-    const data = await callOllama(systemPrompt, message);
-    const cleaned = data.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const data = await callAi(systemPrompt, message);
+    const parsed = JSON.parse(cleanJson(data));
 
     return {
       name:
@@ -39,7 +38,7 @@ Rules:
           : null,
     };
   } catch (err) {
-    console.error("Local AI intake extraction failed:", err.message);
+    console.error("Hosted AI intake extraction failed:", err.message);
     return { name: null, partySize: null };
   }
 }
@@ -55,53 +54,64 @@ Only use these facts:
 - average wait is about ${avgWaitMinutes} minutes
 
 If the customer asks something you don't know, say you are not sure and tell them to ask restaurant staff.
-
+Understand Hindi, Hinglish, and English.
 Keep the response friendly and under 2 short sentences.`;
 
   try {
-    return await callOllama(systemPrompt, message);
+    return await callAi(systemPrompt, message);
   } catch (err) {
-    console.error("Local AI general question failed:", err.message);
+    console.error("Hosted AI general question failed:", err.message);
     return `I can help you join the queue. Reply with your name to get started, or "status" if you're already in line.`;
   }
 }
 
-async function callOllama(systemPrompt, userMessage) {
-  const response = await fetch(OLLAMA_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      format: "json",
-      options: {
-        temperature: 0,
+async function callAi(systemPrompt, userMessage) {
+  if (!process.env.AI_API_KEY) {
+    throw new Error("AI_API_KEY is not configured");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.AI_API_KEY}`,
       },
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: userMessage,
-        },
-      ],
-    }),
-  });
+      body: JSON.stringify({
+        model: AI_MODEL,
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Ollama API returned ${response.status}: ${errorBody}`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`AI API returned ${response.status}: ${errorBody}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No content returned from AI provider");
+    }
+
+    return content.trim();
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  const data = await response.json();
-
-  if (!data.message?.content) {
-    throw new Error("No content returned from Ollama");
-  }
-
-  return data.message.content.trim();
+function cleanJson(value) {
+  return value
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
 }
