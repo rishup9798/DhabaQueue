@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createApiClient } from "../api.js";
 
-export default function TableGrid({ tables = [] }) {
+export default function TableGrid({ tables = [], onTableAdded }) {
   const [number, setNumber] = useState("");
   const [capacity, setCapacity] = useState("2");
   const [error, setError] = useState("");
@@ -31,7 +31,7 @@ export default function TableGrid({ tables = [] }) {
       });
       setNumber("");
       setCapacity("2");
-      window.location.reload();
+      if (onTableAdded) await onTableAdded(table);
     } catch (err) {
       setError(err.message || "Couldn't add table.");
     } finally {
