@@ -400,16 +400,6 @@ It combines:
 
 ---
 
-## 📌 Resume Description
-
-**DhabaQueue | AI-Powered Restaurant Queue & Operations Platform**
-
-- Engineered a full-stack restaurant operations platform using **React, Node.js, Express, PostgreSQL, Prisma, and Socket.IO**, enabling real-time queue, table, and food-order management.
-- Integrated **AI-powered WhatsApp intake** to extract customer names and party sizes from natural-language English, Hindi, and Hinglish messages and automatically create queue entries.
-- Implemented automated **table allocation, queue state management, customer notifications, and food lifecycle tracking** from ORDERED to SERVED, with persistent operational history.
-
----
-
 ## 🔮 Future Enhancements
 
 - Multi-restaurant SaaS onboarding.
@@ -421,8 +411,5 @@ It combines:
 - Customer feedback and visit history.
 
 ---
-
-## 👨‍💻 Project
-
-**DhabaQueue** is built as a portfolio-ready full-stack project demonstrating modern web development, AI integration, real-time communication, database engineering, and third-party API integration.
+.
 
