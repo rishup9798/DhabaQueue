@@ -47,7 +47,7 @@ export function createApiClient(token) {
     },
 
     get(path) {
-      return this.request(path);
+      return this.request(path, { method: "GET" });
     },
 
     post(path, body) {
