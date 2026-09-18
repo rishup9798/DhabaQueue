@@ -1,84 +1,180 @@
 # DhabaQueue 🍽️
 
-> A smart restaurant queue management system that connects WhatsApp customer intake with a real-time staff dashboard.
+> **AI-powered restaurant queue and operations platform** that connects WhatsApp customer intake with a real-time staff dashboard, automated table allocation, and live food-order tracking.
 
-DhabaQueue is a full-stack restaurant queue management application designed to reduce manual queue handling and improve communication between customers and restaurant staff.
+DhabaQueue is a full-stack SaaS-style restaurant operations project built to solve a practical problem: managing walk-in queues, tables, customer notifications, and food operations from one system.
 
-Customers can provide their name and party size through WhatsApp, while restaurant staff manage the queue, tables, notifications, and food orders from a centralized dashboard.
-
----
-
-## ✨ Features
-
-### 📱 WhatsApp Customer Intake
-- Customers can provide their name and party size through WhatsApp.
-- AI extracts structured information from natural-language messages.
-- Example:
-  - `Hi, I'm Ramesh. Table for 4 please.`
-- Extracted information is automatically converted into a queue entry.
-
-### 🤖 Local AI Processing
-- Uses **Ollama + Llama 3.2** for natural-language understanding.
-- Runs locally without paid AI API usage.
-- Extracts:
-  - Customer name
-  - Party size
-- Can also handle basic queue-related questions.
-
-### 📊 Real-Time Queue Dashboard
-- Live restaurant queue management.
-- Search and filter customers.
-- Queue status tracking.
-- Real-time updates using Socket.IO.
-
-### 🔔 Customer Notification
-Staff can manually notify customers when their table is ready.
-
-### 🪑 Table Management
-Staff can manage table availability and seating from the dashboard.
-
-### 🍛 Food Order Tracking
-Track food orders through multiple stages:
-
-`ORDERED → PREPARING → READY → SERVED`
-
-### 🚶 Walk-In Customers
-Staff can manually add customers who arrive without using WhatsApp.
-
-### 🔐 Authentication
-- Staff login system.
-- Protected dashboard routes.
-- JWT-based authentication.
+Customers can join the queue through WhatsApp using natural language, while restaurant staff manage the entire workflow from a responsive dashboard.
 
 ---
 
-## 🏗️ System Architecture
+## 🚀 What DhabaQueue Does
 
 ```text
-                  Customer
-                     │
-                     │ WhatsApp
-                     ▼
-              WhatsApp Webhook
-                     │
-                     ▼
-              Node.js Backend
-                     │
-             ┌───────┴────────┐
-             │                │
-             ▼                ▼
-        Ollama AI          PostgreSQL
-             │                │
-             └───────┬────────┘
-                     │
-                     ▼
-              Socket.IO
-                     │
-                     ▼
-            Staff Dashboard
-             │      │      │
-             ▼      ▼      ▼
-           Queue  Tables  Food Orders
+Customer WhatsApp
+      ↓
+Meta WhatsApp Cloud API
+      ↓
+Webhook
+      ↓
+Node.js + Express Backend
+      ↓
+AI extracts name + party size
+      ↓
+PostgreSQL + Prisma
+      ↓
+Socket.IO real-time updates
+      ↓
+Staff Dashboard
+      ├── Queue
+      ├── Tables
+      └── Food Orders
+```
+
+The system follows a complete restaurant workflow:
+
+```text
+WAITING
+   ↓
+NOTIFIED
+   ↓
+SEATED
+   ↓
+ORDERED → PREPARING → READY → SERVED
+   ↓
+COMPLETED
+```
+
+---
+
+## ✨ Key Features
+
+### 📱 WhatsApp Customer Intake
+- Customers can send natural-language messages to the restaurant.
+- Supports English, Hindi, and Hinglish input.
+- AI extracts the customer's **name** and **party size**.
+- The extracted information is automatically converted into a queue entry.
+- Supports queue-status conversations.
+
+Example:
+
+```text
+"Hi, I'm Ramesh. Table for 4 please."
+```
+
+AI extracts:
+
+```json
+{
+  "name": "Ramesh",
+  "partySize": 4
+}
+```
+
+### 🤖 AI-Powered Processing
+- Uses a hosted OpenAI-compatible API instead of depending on a local AI server in production.
+- Structured extraction is performed through the backend.
+- Designed to understand English, Hindi, and Hinglish.
+- AI is used for both customer intake and basic queue-related questions.
+- Configurable through `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`.
+
+### 📊 Real-Time Staff Dashboard
+- Live queue management.
+- Search and filtering.
+- Queue status updates.
+- Real-time synchronization using Socket.IO.
+- Dashboard sections for queue, tables, and food operations.
+
+### 🪑 Automatic Table Allocation
+When staff seat a customer, DhabaQueue automatically selects the **smallest available table that can accommodate the party size**.
+
+Staff can manage table numbers and capacities from the dashboard.
+
+### 🔔 Customer Notifications
+- Staff can notify customers when their table is ready.
+- WhatsApp messaging is supported through the Meta WhatsApp Cloud API.
+- Walk-in customers can also be associated with a phone number for notifications.
+- Demo mode is available for development without sending real WhatsApp messages.
+
+### 🍛 Food Operations
+Track food orders through:
+
+```text
+ORDERED → PREPARING → READY → SERVED
+```
+
+When an order becomes **READY**, the system can notify the customer through WhatsApp.
+
+When an order becomes **SERVED**:
+- The queue entry is completed.
+- The occupied table is released.
+- The order remains available in history.
+
+### 🚶 Walk-In Management
+Restaurant staff can manually add customers who arrive without WhatsApp.
+
+### 🔐 Authentication
+- Staff login.
+- JWT-based authentication.
+- Restaurant-scoped queue and operations.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | React, Vite, Tailwind CSS, React Router |
+| UI / Animation | Framer Motion, GSAP, Lucide React |
+| Backend | Node.js, Express.js |
+| Database | PostgreSQL |
+| ORM | Prisma |
+| Real-Time | Socket.IO |
+| AI | OpenAI-compatible REST API |
+| WhatsApp | Meta WhatsApp Cloud API |
+| Authentication | JWT, bcryptjs |
+| Deployment | Render |
+| Development | Git, GitHub, Docker |
+
+---
+
+## 🏗️ Architecture
+
+```text
+                         CUSTOMER
+                            │
+                            │ WhatsApp
+                            ▼
+                  Meta WhatsApp Cloud API
+                            │
+                            │ Webhook
+                            ▼
+                  ┌─────────────────────┐
+                  │   Node.js / Express │
+                  └──────────┬──────────┘
+                             │
+                  ┌──────────┴──────────┐
+                  ▼                     ▼
+             Hosted AI              PostgreSQL
+                  │                   Prisma
+                  │                     │
+                  └──────────┬──────────┘
+                             ▼
+                       Queue Engine
+                             │
+                         Socket.IO
+                             │
+                             ▼
+                    STAFF DASHBOARD
+                     /      |       \
+                    ▼       ▼        ▼
+                 Queue   Tables   Food Orders
+                    │       │        │
+                    └───────┴────────┘
+                             │
+                             ▼
+                    Customer Notification
+                         via WhatsApp
 ```
 
 ---
@@ -86,7 +182,7 @@ Staff can manually add customers who arrive without using WhatsApp.
 ## 📁 Project Structure
 
 ```text
-dhaba-queue/
+DhabaQueue/
 │
 ├── backend/
 │   ├── prisma/
@@ -130,41 +226,44 @@ dhaba-queue/
 
 ## ⚙️ Local Setup
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/dhaba-queue.git
-cd dhaba-queue
+git clone https://github.com/rishup9798/DhabaQueue.git
+cd DhabaQueue
 ```
 
-### 2. Install backend dependencies
+### 2. Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-### 3. Configure environment variables
-
-Create `backend/.env` and add your local configuration:
+Create `backend/.env`:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dhaba_queue"
 PORT=4000
 JWT_SECRET="your-secret"
 
-WHATSAPP_TOKEN="your-token"
+AI_API_KEY="your-ai-api-key"
+AI_BASE_URL="https://api.openai.com/v1"
+AI_MODEL="gpt-4o-mini"
+
+WHATSAPP_TOKEN="your-whatsapp-token"
 WHATSAPP_PHONE_NUMBER_ID="your-phone-number-id"
 WEBHOOK_VERIFY_TOKEN="your-verification-token"
 
 DEMO_MODE="true"
+FRONTEND_ORIGIN="http://localhost:5173"
 ```
 
-> ⚠️ Never commit `.env` files or API credentials to GitHub.
+> **Never commit API keys, access tokens, passwords, or `.env` files to GitHub.**
 
-### 4. Start PostgreSQL
+### 3. Database
 
-The project can be run using a local PostgreSQL instance or Docker.
+Start PostgreSQL locally or with Docker:
 
 ```bash
 docker run --name dhaba-postgres \
@@ -175,7 +274,7 @@ docker run --name dhaba-postgres \
   -d postgres:16
 ```
 
-### 5. Set up Prisma
+Then:
 
 ```bash
 npx prisma generate
@@ -183,15 +282,19 @@ npx prisma migrate dev
 node prisma/seed.js
 ```
 
-### 6. Start the backend
+### 4. Start Backend
 
 ```bash
 npm run dev
 ```
 
-Backend runs at: `http://localhost:4000`
+Backend:
 
-### 7. Start the frontend
+```text
+http://localhost:4000
+```
+
+### 5. Start Frontend
 
 Open another terminal:
 
@@ -201,68 +304,125 @@ npm install
 npm run dev
 ```
 
-Frontend runs at: `http://localhost:5173`
-
----
-
-## 🤖 Running the Local AI
-
-Install Ollama and pull the model:
-
-```bash
-ollama pull llama3.2:3b
-```
-
-Start Ollama:
-
-```bash
-ollama serve
-```
-
-The backend communicates with the local Ollama server.
-
-**Example customer message:**
+Frontend:
 
 ```text
-Hi, I'm Ramesh. I need a table for 4.
+http://localhost:5173
 ```
-
-**AI extracts:**
-
-```json
-{
-  "name": "Ramesh",
-  "partySize": 4
-}
-```
-
-The backend then creates the corresponding queue entry.
-
----
-
-## 🎬 Demo Workflow
-
-A complete local demonstration can be performed without paid AI APIs:
-
-1. Start PostgreSQL.
-2. Start Ollama.
-3. Start the backend.
-4. Start the frontend.
-5. Open the dashboard.
-6. Simulate a WhatsApp customer message.
-7. Ollama extracts the customer's name and party size.
-8. Backend creates the queue entry.
-9. Customer appears on the live dashboard.
-10. Staff notify the customer.
-11. Staff seat the customer.
-12. Staff track the food order.
 
 ---
 
 ## 💬 WhatsApp Integration
 
-DhabaQueue includes support for the Meta WhatsApp Cloud API and webhook-based customer intake.
+DhabaQueue is designed around the **Meta WhatsApp Cloud API**.
 
-For local development, the application also provides a demo mode so the complete queue workflow can be demonstrated without relying on external WhatsApp message delivery.
+Incoming customer messages are received through:
 
-The AI processing itself runs locally through Ollama.
+```text
+POST /webhook/whatsapp
+```
+
+The backend:
+1. Receives the WhatsApp webhook.
+2. Identifies the restaurant.
+3. Sends the customer message to the AI layer.
+4. Extracts name and party size.
+5. Creates or updates the queue entry.
+6. Sends a WhatsApp response.
+7. Pushes the queue update to connected staff dashboards through Socket.IO.
+
+For development, `DEMO_MODE=true` logs outgoing WhatsApp messages instead of sending them.
+
+---
+
+## 🔄 Example End-to-End Flow
+
+**Customer:**
+
+```text
+Hi, I'm Rahul. Table for 3 please.
+```
+
+**AI:**
+
+```text
+name = Rahul
+partySize = 3
+```
+
+**Backend:**
+
+```text
+Create QueueEntry
+      ↓
+Calculate estimated wait
+      ↓
+Notify dashboard through Socket.IO
+```
+
+**Staff:**
+
+```text
+Notify → Seat
+```
+
+DhabaQueue automatically finds a suitable free table.
+
+Then the food workflow starts:
+
+```text
+ORDERED
+   ↓
+PREPARING
+   ↓
+READY → WhatsApp notification
+   ↓
+SERVED
+   ↓
+Queue COMPLETED + Table FREE
+```
+
+---
+
+## 🎯 Why This Project
+
+DhabaQueue demonstrates practical full-stack engineering rather than a standalone CRUD application.
+
+It combines:
+
+- **Frontend engineering** — responsive React dashboard and interactive UI.
+- **Backend development** — REST APIs, business logic, authentication, and validation.
+- **Database design** — relational models and transactional table/queue updates with Prisma.
+- **Real-time systems** — Socket.IO event-driven dashboard updates.
+- **AI integration** — natural-language customer intake and structured data extraction.
+- **Third-party API integration** — Meta WhatsApp Cloud API.
+- **Deployment** — frontend/backend deployment with environment-based configuration.
+
+---
+
+## 📌 Resume Description
+
+**DhabaQueue | AI-Powered Restaurant Queue & Operations Platform**
+
+- Engineered a full-stack restaurant operations platform using **React, Node.js, Express, PostgreSQL, Prisma, and Socket.IO**, enabling real-time queue, table, and food-order management.
+- Integrated **AI-powered WhatsApp intake** to extract customer names and party sizes from natural-language English, Hindi, and Hinglish messages and automatically create queue entries.
+- Implemented automated **table allocation, queue state management, customer notifications, and food lifecycle tracking** from ORDERED to SERVED, with persistent operational history.
+
+---
+
+## 🔮 Future Enhancements
+
+- Multi-restaurant SaaS onboarding.
+- Analytics and restaurant performance dashboards.
+- Advanced wait-time prediction.
+- Staff roles and permissions.
+- Queue forecasting based on historical traffic.
+- Automated WhatsApp templates for production messaging.
+- Customer feedback and visit history.
+
+---
+
+## 👨‍💻 Project
+
+**DhabaQueue** is built as a portfolio-ready full-stack project demonstrating modern web development, AI integration, real-time communication, database engineering, and third-party API integration.
+
