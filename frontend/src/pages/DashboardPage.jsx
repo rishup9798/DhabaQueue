@@ -144,6 +144,10 @@ const [foodHistory, setFoodHistory] = useState([]);
     await loadData();
   }
 
+  async function handleTableAdded() {
+    await loadData();
+  }
+
   async function handleUpdateFoodItems(orderId, itemsSummary) {
     await api.patch(`/api/queue/food-orders/${orderId}`, {
       itemsSummary,
@@ -413,7 +417,7 @@ const [foodHistory, setFoodHistory] = useState([]);
 
               </div>
 
-              <TableGrid tables={tables} />
+              <TableGrid tables={tables} onTableAdded={handleTableAdded} />
 
             </div>
 
